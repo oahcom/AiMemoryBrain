@@ -1,0 +1,155 @@
+# 第三方组件与数据许可声明
+
+本文件用于登记 `oahcom/AiMemoryBrain` 仓库分发物中包含的第三方成分及其适用许可，明确第三方数据文件、Rust 依赖及其许可归属和分发要求。
+
+本文件中的中文内容仅用于说明、索引和维护。英文许可原文应作为法律文本阅读，中文翻译不构成许可原文，也不具有替代许可原文的法律效力。发生理解差异时，以相应许可的英文原文为准。
+
+## 第一节 Unicode Data
+
+### 1.1 数据来源与文件清单
+
+以下四份数据文件来自 Unicode Consortium 发布的 Unicode Character Database 15.1.0：
+
+| 文件路径 | 来源 | 版权归属 | 许可 |
+|---|---|---|---|
+| `ucd/15.1.0/UnicodeData.txt` | Unicode Consortium | Unicode, Inc. | Unicode License Agreement |
+| `ucd/15.1.0/NormalizationTest.txt` | Unicode Consortium | Unicode, Inc. | Unicode License Agreement |
+| `ucd/15.1.0/DerivedNormalizationProps.txt` | Unicode Consortium | Unicode, Inc. | Unicode License Agreement |
+| `ucd/15.1.0/CompositionExclusions.txt` | Unicode Consortium | Unicode, Inc. | Unicode License Agreement |
+
+版权归属：Copyright © 1991-2023 Unicode, Inc.
+
+上述文件受 Unicode License V3（Unicode, Inc. License Agreement - Data Files and Software）约束。项目保留并随分发物提供适用的版权及许可声明。
+
+### 1.2 项目自产派生文件
+
+以下文件由本项目自行生成或维护，不属于上述第三方 Unicode 原始数据文件：
+
+- `ucd/15.1.0/ucd-lock.json`
+- `ucd/15.1.0/derived/normalization-index.json`
+
+这两份文件是本项目自产的派生索引，其内容和维护责任归属于本项目，不因引用 Unicode 原始数据而成为 Unicode Consortium 发布的第三方数据文件。
+
+### 1.3 Unicode License V3 全文
+
+以下为适用于 Unicode 数据文件的英文许可原文。许可文本不得翻译后替代原文。
+
+```text
+UNICODE LICENSE V3
+
+COPYRIGHT AND PERMISSION NOTICE
+
+Copyright © 1991-2023 Unicode, Inc.
+
+NOTICE TO USER: Carefully read the following legal agreement. BY
+DOWNLOADING, INSTALLING, COPYING OR OTHERWISE USING DATA FILES, AND/OR
+SOFTWARE, YOU UNEQUIVOCALLY ACCEPT, AND AGREE TO BE BOUND BY, ALL OF THE
+TERMS AND CONDITIONS OF THIS AGREEMENT. IF YOU DO NOT AGREE, DO NOT
+DOWNLOAD, INSTALL, COPY, DISTRIBUTE OR USE THE DATA FILES OR SOFTWARE.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of data files and any associated documentation (the "Data Files") or
+software and any associated documentation (the "Software") to deal in the
+Data Files or Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, and/or sell
+copies of the Data Files or Software, and to permit persons to whom the
+Data Files or Software are furnished to do so, provided that either (a)
+this copyright and permission notice appear with all copies of the Data
+Files or Software, or (b) this copyright and permission notice appear in
+associated Documentation.
+
+THE DATA FILES AND SOFTWARE ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY
+KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF
+THIRD PARTY RIGHTS.
+
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR HOLDERS INCLUDED IN THIS NOTICE
+BE LIABLE FOR ANY CLAIM, OR ANY SPECIAL INDIRECT OR CONSEQUENTIAL DAMAGES,
+OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THE DATA
+FILES OR SOFTWARE.
+
+Except as contained in this notice, the name of a copyright holder shall
+not be used in advertising or otherwise to promote the sale, use or other
+dealings in these Data Files or Software without prior written
+authorization of the copyright holder.
+```
+
+### 1.4 许可义务说明
+
+Unicode License V3 授权使用者免费使用、复制、修改、合并、发布、分发和销售相关数据文件及软件副本，但须满足许可中的版权及许可声明保留要求。
+
+本仓库在分发上述 Unicode 数据文件时，通过本文件保留相应版权与许可声明。
+
+不得将 Unicode, Inc. 的名称或商标解释为对本项目的背书或认可。
+
+## 第二节 Rust Crates
+
+### 2.1 依赖清单
+
+以下清单覆盖 `Cargo.toml` 中全部直接依赖、构建依赖和开发依赖。
+
+| Crate | Version | License | Scope |
+|---|---|---|---|
+| `clap` | 4.5.53 | MIT OR Apache-2.0 | dependencies |
+| `serde` | 1.0.228 | MIT OR Apache-2.0 | dependencies |
+| `serde_json` | 1.0.145 | MIT OR Apache-2.0 | dependencies |
+| `sha2` | 0.10.9 | MIT OR Apache-2.0 | dependencies |
+| `unicode-normalization` | 0.1.24 | MIT OR Apache-2.0 | dependencies |
+| `toml` | 0.9.8 | MIT OR Apache-2.0 | dependencies |
+| `serde` | 1.0.228 | MIT OR Apache-2.0 | build-dependencies |
+| `serde_json` | 1.0.145 | MIT OR Apache-2.0 | build-dependencies |
+| `sha2` | 0.10.9 | MIT OR Apache-2.0 | build-dependencies |
+| `serde` | 1.0.228 | MIT OR Apache-2.0 | dev-dependencies |
+| `serde_json` | 1.0.145 | MIT OR Apache-2.0 | dev-dependencies |
+
+### 2.2 Rust 依赖许可说明
+
+上述 crate 均采用 `MIT OR Apache-2.0` 双许可，即使用者可以按照其适用的 MIT 或 Apache License 2.0 条款使用。
+
+本项目选择按照 Apache License 2.0 条款使用上述依赖。Apache License 2.0 的完整标准文本由仓库根目录 `LICENSE` 提供。
+
+各 crate 的完整许可文本随各 crate 分发。依赖许可信息可通过 `cargo metadata` 或相应 crate 在 crates.io 上的发布信息获取。
+
+本表登记的是 `Cargo.toml` 中声明的直接、构建和开发依赖，不应被解释为完整的传递依赖清单。传递依赖及精确解析版本以 `Cargo.lock` 为准。
+
+## 第三节 变更与维护
+
+### 3.1 依赖变更
+
+新增 Rust 依赖、移除依赖、升级依赖版本或调整依赖作用域时，必须同步检查并更新本文件。
+
+更新至少应核对：
+
+1. crate 名称；
+2. 实际解析或声明的版本；
+3. 许可证标识；
+4. 依赖作用域；
+5. 许可证文本及分发义务是否发生变化。
+
+不得仅根据 crate 名称或生态惯例推断许可证。应核对对应版本的 crate 元数据及实际发布内容。
+
+### 3.2 第三方数据变更
+
+新增第三方数据来源、升级 Unicode 数据版本、替换 Unicode 数据文件或引入其他第三方版权内容时，必须重新核对：
+
+1. 数据来源；
+2. 版权归属；
+3. 适用许可版本；
+4. 许可声明保留要求；
+5. 修改、再分发和派生作品义务。
+
+上述核对结果必须与对应变更的决策记录一同归档。
+
+### 3.3 证据权威性
+
+本文件是第三方成分和许可的维护性登记文件，不构成许可合规的唯一证据。
+
+`Cargo.lock` 是 Rust 依赖树及精确解析版本的权威记录。本文件不得替代 `Cargo.lock`、crate 原始许可文件、Unicode 原始版权与许可声明，也不得替代针对具体分发物进行的许可合规核查。
+
+### 3.4 许可文本效力
+
+本文件所附英文许可原文用于保留和展示相应第三方许可条款。
+
+任何中文说明或翻译仅为辅助理解，不改变许可原文，不构成对许可条款的修改，也不具有替代英文许可原文的法律效力。
