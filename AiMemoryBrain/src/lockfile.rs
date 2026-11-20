@@ -54,6 +54,7 @@ pub struct NormalizerBinding {
     pub crate_name: String,
     pub crate_version: String,
     pub cargo_lock_sha256: String,
+    pub role: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -346,6 +347,8 @@ pub fn validate_envelope(
         &payload.normalizer.cargo_lock_sha256,
     )?;
 
+    validate_nonempty("normalizer.role", &payload.normalizer.role)?;
+
     validate_nonempty("generator.name", &payload.generator.name)?;
     validate_nonempty("generator.version", &payload.generator.version)?;
 
@@ -471,6 +474,7 @@ mod tests {
                 crate_name: "unicode-normalization".to_owned(),
                 crate_version: "0.1.24".to_owned(),
                 cargo_lock_sha256: "d".repeat(64),
+                role: "normalization_engine_verified_against_locked_ucd_corpus".to_owned(),
             },
             generator: GeneratorIdentity {
                 name: "d-unicode-validator".to_owned(),
