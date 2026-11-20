@@ -1,0 +1,69 @@
+schema_version: 1
+finding: F-43-01/F1
+contract: D-contract-1.3.1
+status: NOT_RUN_NOT_EVIDENCED
+
+# Preserve the ten scenarios from the accepted D proof pack.
+# Do not invent scenario semantics. Each entry must be mapped to its
+# exact normative clause and original evidence source before implementation.
+
+scenarios:
+  - id: S01
+    normative_clause: PENDING_EXACT_CLAUSE_MAPPING
+    source_evidence: PENDING
+    expected_result: PENDING
+    execution_status: NOT_RUN
+
+  - id: S02
+    normative_clause: PENDING_EXACT_CLAUSE_MAPPING
+    source_evidence: PENDING
+    expected_result: PENDING
+    execution_status: NOT_RUN
+
+  - id: S03
+    normative_clause: PENDING_EXACT_CLAUSE_MAPPING
+    source_evidence: PENDING
+    expected_result: PENDING
+    execution_status: NOT_RUN
+
+  - id: S04
+    normative_clause: PENDING_EXACT_CLAUSE_MAPPING
+    source_evidence: PENDING
+    expected_result: PENDING
+    execution_status: NOT_RUN
+
+  - id: S05
+    normative_clause: PENDING_EXACT_CLAUSE_MAPPING
+    source_evidence: PENDING
+    expected_result: PENDING
+    execution_status: NOT_RUN
+
+  - id: S06
+    normative_clause: PENDING_EXACT_CLAUSE_MAPPING
+    source_evidence: PENDING
+    expected_result: PENDING
+    execution_status: NOT_RUN
+
+  - id: S07
+    normative_clause: PENDING_EXACT_CLAUSE_MAPPING
+    source_evidence: PENDING
+    expected_result: PENDING
+    execution_status: NOT_RUN
+
+  - id: S08
+    normative_clause: PENDING_EXACT_CLAUSE_MAPPING
+    source_evidence: PENDING
+    expected_result: PENDING
+    execution_status: NOT_RUN
+
+  - id: S09
+    normative_clause: PENDING_EXACT_CLAUSE_MAPPING
+    source_evidence: PENDING
+    expected_result: PENDING
+    execution_status: NOT_RUN
+
+  - id: S10
+    normative_clause: PENDING_EXACT_CLAUSE_MAPPING
+    source_evidence: PENDING
+    expected_result: PENDING
+    execution_status: NOT_RUN

@@ -1,0 +1,53 @@
+{
+  "payload": {
+    "schema_version": 1,
+    "unicode_version": "15.1.0",
+    "unicode_release_url": "https://www.unicode.org/Public/15.1.0/ucd/",
+    "files": [
+      {
+        "path": "ucd/15.1.0/UnicodeData.txt",
+        "sha256": "REPLACE_WITH_REMOTE_SHA256",
+        "size_bytes": 0,
+        "role": "normative_unicode_character_database"
+      },
+      {
+        "path": "ucd/15.1.0/NormalizationTest.txt",
+        "sha256": "REPLACE_WITH_REMOTE_SHA256",
+        "size_bytes": 0,
+        "role": "normative_normalization_conformance_corpus"
+      },
+      {
+        "path": "ucd/15.1.0/DerivedNormalizationProps.txt",
+        "sha256": "REPLACE_WITH_REMOTE_SHA256",
+        "size_bytes": 0,
+        "role": "normalization_derived_properties_input"
+      },
+      {
+        "path": "ucd/15.1.0/CompositionExclusions.txt",
+        "sha256": "REPLACE_WITH_REMOTE_SHA256",
+        "size_bytes": 0,
+        "role": "normalization_composition_exclusion_input"
+      }
+    ],
+    "derived_artifacts": [
+      {
+        "path": "ucd/15.1.0/derived/normalization-index.json",
+        "sha256": "REPLACE_WITH_GENERATED_SHA256",
+        "size_bytes": 0,
+        "generator_version": "d-ucd-generator/0.1.0",
+        "input_payload_sha256": "REPLACE_WITH_INPUT_SET_DIGEST"
+      }
+    ],
+    "normalizer": {
+      "crate_name": "unicode-normalization",
+      "crate_version": "0.1.24",
+      "cargo_lock_sha256": "REPLACE_WITH_CARGO_LOCK_SHA256",
+      "role": "normalization_engine_verified_against_locked_ucd_corpus"
+    },
+    "generator": {
+      "name": "d-ucd-generator",
+      "version": "0.1.0"
+    }
+  },
+  "payload_sha256": "REPLACE_WITH_SHA256_OF_COMPACT_SERIALIZED_PAYLOAD"
+}
