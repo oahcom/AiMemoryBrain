@@ -207,11 +207,14 @@ pub fn parse_normalization_test(
         let line = raw_line.strip_suffix('\r').unwrap_or(raw_line);
         let data = line.split('#').next().unwrap_or("").trim();
 
-        if data.is_empty() {
+        if data.is_empty() || data.starts_with("@Part") {
             continue;
         }
 
-        let columns: Vec<&str> = data.split(';').collect();
+        let mut columns: Vec<&str> = data.split(';').collect();
+        if columns.last().is_some_and(|column| column.trim().is_empty()) {
+            columns.pop();
+        }
 
         if columns.len() != 5 {
             return Err(UcdError::Invalid(format!(
