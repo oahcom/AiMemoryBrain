@@ -135,6 +135,7 @@ fn verify_file(
 }
 
 fn main() {
+    println!("cargo:rerun-if-changed=Cargo.lock");
     println!("cargo:rerun-if-changed={LOCK_PATH}");
     for path in REQUIRED_FILES {
         println!("cargo:rerun-if-changed={path}");
@@ -173,6 +174,48 @@ fn main() {
         "payload.normalizer.cargo_lock_sha256",
         &envelope.payload.normalizer.cargo_lock_sha256,
     );
+
+    let cargo_lock_path = root.join("Cargo.lock");
+    let cargo_lock_bytes = fs::read(&cargo_lock_path).unwrap_or_else(|error| {
+        panic!("Cargo.lock: expected readable file at {}, actual I/O error: {error}", cargo_lock_path.display())
+    });
+    let actual_cargo_lock_sha256 = sha256_hex(&cargo_lock_bytes);
+    let expected_cargo_lock_sha256 = &envelope.payload.normalizer.cargo_lock_sha256;
+    if actual_cargo_lock_sha256 != *expected_cargo_lock_sha256 {
+        panic!(
+            "payload.normalizer.cargo_lock_sha256: expected {}, actual {}",
+            expected_cargo_lock_sha256, actual_cargo_lock_sha256
+        );
+    }
+
+    let cargo_lock_text = std::str::from_utf8(&cargo_lock_bytes)
+        .unwrap_or_else(|error| panic!("Cargo.lock: expected UTF-8 TOML, actual UTF-8 error: {error}"));
+    let mut observed_versions = Vec::new();
+    for package in cargo_lock_text.split("[[package]]").skip(1) {
+        let name = package.lines().find_map(|line| {
+            line.trim().strip_prefix("name = \"").and_then(|value| value.strip_suffix('"'))
+        });
+        if name == Some(envelope.payload.normalizer.crate_name.as_str()) {
+            let version = package.lines().find_map(|line| {
+                line.trim().strip_prefix("version = \"").and_then(|value| value.strip_suffix('"'))
+            });
+            observed_versions.push(version.unwrap_or("<missing version>").to_owned());
+        }
+    }
+    let expected_version = &envelope.payload.normalizer.crate_version;
+    if observed_versions.is_empty() || !observed_versions.iter().any(|version| version == expected_version) {
+        let actual = if observed_versions.is_empty() {
+            "<package missing>".to_owned()
+        } else {
+            observed_versions.join(", ")
+        };
+        panic!(
+            "Cargo.lock package {} version: expected {}, actual {}",
+            envelope.payload.normalizer.crate_name, expected_version, actual
+        );
+    }
+
+    println!("cargo:rerun-if-changed={}", cargo_lock_path.display());
 
     let payload_bytes = serde_json::to_vec(&envelope.payload)
         .unwrap_or_else(|error| panic!("payload serialization: expected serializable typed payload, actual error: {error}"));
