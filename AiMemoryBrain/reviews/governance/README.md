@@ -28,6 +28,7 @@ submissions or as substitutes for GitHub's approval mechanism.
 
 | Report ID | Review target (frozen head SHA) | Verdict | Merge state at archival | Archival commit SHA | Archival PR merge commit SHA |
 |---|---|---|---|---|---|
+| REV-2026-11-20-001 | `ff1b72a19a55f973ad200665aa74f6eec53764f8` | REVISE | MERGED — PR #1, merge commit `341bb04b` | See this archival commit | To be recorded by subsequent index update |
 | REV-2026-11-20-009 | `f2bc4d81e66bf819ef6f9c2967c1a54332143b26` | APPROVE | MERGED — PR #4, merge commit `c12926b66fbd399ad2b3235c285f47469aa7ee2c` (merge method: merge) | `94c3326c0c4c0166876fc86a62946516ee40600e` | `0df3d146dc54002668a2c8cfb26af9fbf9b5743c` (PR #7) |
 
 ### Archived artifact integrity
@@ -136,19 +137,21 @@ substituted for that reviewed head.
 
 ## Review-round coverage
 
-This archive contains only the R9 report:
+This archive contains the following individually archived
+review reports:
 
-`REV-2026-11-20-009-independent-review.md`
+- **R1:** `REV-2026-11-20-001-independent-review.md`
+  - Review target: PR #1 frozen head
+    `ff1b72a19a55f973ad200665aa74f6eec53764f8`
+  - Verdict: `VERDICT: REVISE`
+- **R9:** `REV-2026-11-20-009-independent-review.md`
 
-R1–R8 reports have NOT been individually archived in this directory.
+R2–R8 review reports were never produced. No individual
+report files exist for those review rounds.
 
-The conclusions of R1–R8 are represented through the R9 report
-and the associated decision record:
-
-`DEC-RD-2026-11-20-002.md`
-
-Their mention does not imply that individual R1–R8 report files
-have been archived here.
+The existence of the R1 and R9 reports does not imply
+that individual R2–R8 report files exist or have been
+archived.
 
 ## GitHub approval boundary
 
