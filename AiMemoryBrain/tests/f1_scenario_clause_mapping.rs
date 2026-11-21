@@ -15,7 +15,7 @@ fn complete_evidence(namespace: &str) -> SixConditionEvidence {
         canonical_request_digest: Some("sha256:request-A".into()),
         target_set_digest: Some("sha256:targets-A".into()),
         forget_fence_cursor: Some(format!("fence-cursor-{namespace}")),
-        forget_fence_generation: Some(ForgetFenceGeneration(3)),
+        forget_fence_generation: Some(ForgetFenceGeneration::new(3).expect("valid generation")),
         installation_canonical_commit_cursor: Some(format!("commit-cursor-{namespace}")),
         immutable_snapshot_id: Some(format!("snapshot-{namespace}")),
         captured_producer_registration_high_water:
@@ -109,7 +109,7 @@ fn s1_two_namespaces_are_evaluated_independently() {
     // Must reject 3: 不得使用另一 namespace 的 generation。
     let mut substituted_generation = n1.clone();
     substituted_generation.barrier_forget_fence_generation =
-        Some(ForgetFenceGeneration(4));
+        Some(ForgetFenceGeneration::new(4).expect("valid generation"));
     assert_invalid(&substituted_generation);
     assert_not_valid(&substituted_generation);
 
@@ -186,7 +186,7 @@ fn s3_request_identity_and_digest_mismatches_are_rejected() {
     // Must reject 3: ACK 丢失后的第二 generation/cutoff 无法被当作同一结果。
     let mut second_generation = exact_request_shape;
     second_generation.barrier_forget_fence_generation =
-        Some(ForgetFenceGeneration(4));
+        Some(ForgetFenceGeneration::new(4).expect("valid generation"));
     assert_invalid(&second_generation);
     assert_not_valid(&second_generation);
 }
