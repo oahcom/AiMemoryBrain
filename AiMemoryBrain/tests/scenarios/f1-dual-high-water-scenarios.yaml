@@ -3,67 +3,100 @@ finding: F-43-01/F1
 contract: D-contract-1.3.1
 status: NOT_RUN_NOT_EVIDENCED
 
-# Preserve the ten scenarios from the accepted D proof pack.
-# Do not invent scenario semantics. Each entry must be mapped to its
-# exact normative clause and original evidence source before implementation.
-
 scenarios:
-  - id: S01
-    normative_clause: PENDING_EXACT_CLAUSE_MAPPING
-    source_evidence: PENDING
-    expected_result: PENDING
-    execution_status: NOT_RUN
+  - id: S1
+    title: "Two or more namespaces advance concurrently"
+    normative_clause: "D-contract-1.3.1 §5.3.8; D-002 §4 S1; D operation contract §§2, 3.2-3.4, 3.8-3.9"
+    conditions_exercised: [C1, C2, C3, C4, C5, C6]
+    expected_verdict: UNKNOWN
+    expressible_with_current_interface: partial
+    must_reject:
+      - "Comparing N1 installed/captured values with N2 values"
+      - "Cross-namespace equality or substitution"
+      - "Using one namespace's receipt or generation for the other"
+      - "Treating partial namespace success as global completion"
+    test_fn: "s1_two_namespaces_are_evaluated_independently"
+    execution_status: NOT_RUN_NOT_EVIDENCED
 
-  - id: S02
-    normative_clause: PENDING_EXACT_CLAUSE_MAPPING
-    source_evidence: PENDING
-    expected_result: PENDING
-    execution_status: NOT_RUN
+  - id: S2
+    title: "Capture interleaves with install, replacement, or later publication"
+    normative_clause: "D-002 §4 S2; D operation contract §§3.3-3.6, 3.8"
+    conditions_exercised: [C3, C4, C5, C6]
+    expected_verdict: UNKNOWN
+    expressible_with_current_interface: partial
+    must_reject:
+      - "Capture setting or advancing H"
+      - "Capture returning a later ledger tip as a new cutoff"
+      - "Split currentness reads or retrying reads until a matching version appears"
+      - "Publishing from an earlier fence check after a later fence has won"
+    test_fn: "s2_capture_requires_existing_immutable_cutoff"
+    execution_status: NOT_RUN_NOT_EVIDENCED
 
-  - id: S03
-    normative_clause: PENDING_EXACT_CLAUSE_MAPPING
-    source_evidence: PENDING
-    expected_result: PENDING
-    execution_status: NOT_RUN
+  - id: S3
+    title: "Same request replay and changed-payload replay"
+    normative_clause: "D-002 §4 S3; D operation contract §§3.3-3.4, 3.8"
+    conditions_exercised: [C2, C3, C4]
+    expected_verdict: UNKNOWN
+    expressible_with_current_interface: partial
+    must_reject:
+      - "Changed request digest under the same operation identity"
+      - "Changed target digest treated as an exact replay"
+      - "Allocating a second generation or cutoff because ACK was lost"
+    test_fn: "s3_request_identity_and_digest_mismatches_are_rejected"
+    execution_status: NOT_RUN_NOT_EVIDENCED
 
-  - id: S04
-    normative_clause: PENDING_EXACT_CLAUSE_MAPPING
-    source_evidence: PENDING
-    expected_result: PENDING
-    execution_status: NOT_RUN
+  - id: S4
+    title: "Crash during operation (before, within, or after durable commit)"
+    normative_clause: "D-002 §4 S4; D operation contract §§3.3, 3.8-3.9"
+    conditions_exercised: [C2, C3, C4, C5, C6]
+    expected_verdict: UNKNOWN
+    expressible_with_current_interface: partial
+    must_reject:
+      - "A receipt for uncommitted state"
+      - "A partial row set interpreted as installed"
+      - "Minting a new operation or generation to escape uncertainty"
+      - "Publication from an ambiguous fence outcome"
+    test_fn: "s4_incomplete_commit_evidence_remains_unknown"
+    execution_status: NOT_RUN_NOT_EVIDENCED
 
-  - id: S05
-    normative_clause: PENDING_EXACT_CLAUSE_MAPPING
-    source_evidence: PENDING
-    expected_result: PENDING
-    execution_status: NOT_RUN
+  - id: S5
+    title: "Durable persistence succeeded but response was lost"
+    normative_clause: "D-002 §4 S5; D operation contract §§3.3-3.4, 3.8"
+    conditions_exercised: [C2, C3, C4, C5]
+    expected_verdict: UNKNOWN
+    expressible_with_current_interface: partial
+    must_reject:
+      - "Treating timeout as abort"
+      - "Using a new idempotency key or generation"
+      - "Recapturing a later cutoff"
+      - "Accepting two different receipts for one operation identity"
+    test_fn: "s5_lost_response_cannot_be_resolved_by_predicate_alone"
+    execution_status: NOT_RUN_NOT_EVIDENCED
 
-  - id: S06
-    normative_clause: PENDING_EXACT_CLAUSE_MAPPING
-    source_evidence: PENDING
-    expected_result: PENDING
-    execution_status: NOT_RUN
+  - id: S6
+    title: "Recovery repeats an operation after restart or restore"
+    normative_clause: "D-contract-1.3.1 §5.4; D-002 §4 S6; D operation contract §§3.8-3.9"
+    conditions_exercised: [C2, C3, C4, C5, C6]
+    expected_verdict: UNKNOWN
+    expressible_with_current_interface: partial
+    must_reject:
+      - "Reusing a prior VALID cache"
+      - "Restoring a lower fence generation or state version as current"
+      - "Generating a fresh cutoff for an old operation"
+      - "Declaring absence from one stale replica to be proof of abort"
+    test_fn: "s6_restore_continuity_and_anti_rollback_remain_unknown"
+    execution_status: NOT_RUN_NOT_EVIDENCED
 
-  - id: S07
-    normative_clause: PENDING_EXACT_CLAUSE_MAPPING
-    source_evidence: PENDING
-    expected_result: PENDING
-    execution_status: NOT_RUN
-
-  - id: S08
-    normative_clause: PENDING_EXACT_CLAUSE_MAPPING
-    source_evidence: PENDING
-    expected_result: PENDING
-    execution_status: NOT_RUN
-
-  - id: S09
-    normative_clause: PENDING_EXACT_CLAUSE_MAPPING
-    source_evidence: PENDING
-    expected_result: PENDING
-    execution_status: NOT_RUN
-
-  - id: S10
-    normative_clause: PENDING_EXACT_CLAUSE_MAPPING
-    source_evidence: PENDING
-    expected_result: PENDING
-    execution_status: NOT_RUN
+  - id: S7
+    title: "Partial success and partial failure across namespaces or sub-operations"
+    normative_clause: "D-002 §4 S7; D operation contract §§3.3-3.4, 3.9"
+    conditions_exercised: [C1, C2, C3, C4, C5, C6]
+    expected_verdict: UNKNOWN
+    expressible_with_current_interface: partial
+    must_reject:
+      - "Rolling back or invalidating a valid independent N1 receipt solely because N2 failed"
+      - "Treating N1 success as aggregate success"
+      - "Silently dropping N2"
+      - "Cross-namespace watermark arithmetic"
+    test_fn: "s7_partial_namespace_success_does_not_establish_aggregate_validity"
+    execution_status: NOT_RUN_NOT_EVIDENCED
