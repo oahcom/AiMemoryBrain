@@ -1,0 +1,90 @@
+# Use --locked rather than --offline: GitHub-hosted runners may not have
+# registry dependencies cached on the first run. Cargo.lock pins dependency
+# resolution; caching the registry and target directories speeds up later runs.
+name: Build and Test
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Rust build and test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4 # 未固定 SHA，待后续钉死
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable # 未固定 SHA，待后续钉死
+        with:
+          toolchain: 1.95.0
+
+      - name: Cache Cargo registry and build artifacts
+        uses: actions/cache@v4 # 未固定 SHA，待后续钉死
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            AiMemoryBrain/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('AiMemoryBrain/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Record target commit and toolchain
+        working-directory: AiMemoryBrain
+        env:
+          TARGET_COMMIT: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p ci-evidence
+          {
+            echo "Target commit: ${TARGET_COMMIT}"
+            echo "Cargo version:"
+            cargo --version
+            echo "Rustc version:"
+            rustc --version
+          } | tee ci-evidence/environment.log
+
+      - name: Build library
+        working-directory: AiMemoryBrain
+        run: |
+          set -euo pipefail
+          cargo build --locked --lib 2>&1 | tee ci-evidence/build-lib.log
+
+      - name: Build tests
+        working-directory: AiMemoryBrain
+        run: |
+          set -euo pipefail
+          cargo build --locked --tests 2>&1 | tee ci-evidence/build-tests.log
+
+      - name: Run tests
+        working-directory: AiMemoryBrain
+        run: |
+          set -euo pipefail
+          cargo test --locked 2>&1 | tee ci-evidence/test.log
+          grep -E "^test result" ci-evidence/test.log
+
+      - name: Calculate source SHA-256 digests
+        working-directory: AiMemoryBrain
+        run: |
+          set -euo pipefail
+          sha256sum \
+            src/d_predicates.rs \
+            tests/f1_scenario_clause_mapping.rs \
+            Cargo.lock | tee ci-evidence/source-sha256.log
+
+      - name: Upload build and test evidence
+        if: always()
+        uses: actions/upload-artifact@v4 # 未固定 SHA，待后续钉死
+        with:
+          name: build-test-evidence-${{ github.event.pull_request.head.sha }}
+          path: AiMemoryBrain/ci-evidence/
+          if-no-files-found: error
+          retention-days: 90
