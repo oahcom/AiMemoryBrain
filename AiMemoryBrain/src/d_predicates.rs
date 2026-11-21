@@ -7,6 +7,7 @@
 
 use crate::authority::DAuthoritativeSource;
 use crate::receipt::{ReceiptSample, validate_operational_receipt};
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Legacy source snapshot shape retained for the authority adapter boundary.
 /// It is not accepted as a substitute for `SixConditionEvidence`.
@@ -19,60 +20,432 @@ pub struct DHighWaterSnapshot {
     pub provenance: String,
 }
 
-/// Nominal cutoff type for producer-registration high-water values.
-///
-/// This deliberately implements equality but not `PartialOrd` or `Ord`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ProducerRegistrationHighWater(u64);
-
-impl ProducerRegistrationHighWater {
-    pub const MAX: u64 = i64::MAX as u64;
-
-    /// Construct a cutoff only when it is in the contract's permitted range.
-    pub const fn new(value: u64) -> Option<Self> {
-        if value <= Self::MAX {
-            Some(Self(value))
-        } else {
-            None
-        }
-    }
-
-    pub const fn get(self) -> u64 {
-        self.0
-    }
-}
-
-impl TryFrom<&str> for ProducerRegistrationHighWater {
-    type Error = HighWaterParseError;
-
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        if value.is_empty() || !value.bytes().all(|byte| byte.is_ascii_digit()) {
-            return Err(HighWaterParseError);
-        }
-
-        let parsed = value
-            .parse::<u64>()
-            .map_err(|_| HighWaterParseError)?;
-        Self::new(parsed).ok_or(HighWaterParseError)
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HighWaterParseError;
 
 impl std::fmt::Display for HighWaterParseError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(
-            "producer-registration high-water must be an unsigned decimal integer in 0..=2^63-1",
+            "high-water/generation must be an unsigned ASCII decimal integer in 0..=2^63-1",
         )
     }
 }
 
 impl std::error::Error for HighWaterParseError {}
 
-/// A fence generation is a different nominal domain from producer high-water.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ForgetFenceGeneration(pub u64);
+macro_rules! define_high_water_type {
+    ($name:ident) => {
+        /// An independent nominal decimal high-water/generation domain.
+        ///
+        /// No ordering or cross-type conversion traits are implemented.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        pub struct $name(u64);
+
+        impl $name {
+            pub const MAX: u64 = i64::MAX as u64;
+
+            pub const fn new(value: u64) -> Option<Self> {
+                if value <= Self::MAX {
+                    Some(Self(value))
+                } else {
+                    None
+                }
+            }
+
+            pub const fn get(self) -> u64 {
+                self.0
+            }
+        }
+
+        impl TryFrom<&str> for $name {
+            type Error = HighWaterParseError;
+
+            fn try_from(value: &str) -> Result<Self, Self::Error> {
+                if value.is_empty()
+                    || !value.bytes().all(|byte| byte.is_ascii_digit())
+                {
+                    return Err(HighWaterParseError);
+                }
+
+                let parsed = value.parse::<u64>().map_err(|_| HighWaterParseError)?;
+                Self::new(parsed).ok_or(HighWaterParseError)
+            }
+        }
+
+        impl std::fmt::Display for $name {
+            fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(formatter, "{}", self.0)
+            }
+        }
+    };
+}
+
+define_high_water_type!(ProducerRegistrationHighWater);
+define_high_water_type!(ForgetFenceGeneration);
+define_high_water_type!(ProducerWorkItemHighWater);
+define_high_water_type!(ProducerWorkAttemptHighWater);
+define_high_water_type!(BarrierGeneration);
+
+/// A lowercase SHA-256 digest bound to the barrier root field.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct BarrierRootDigest(String);
+
+/// A lowercase SHA-256 digest bound to the dependency-closure root field.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct DependencyClosureRootDigest(String);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DigestParseError;
+
+impl std::fmt::Display for DigestParseError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("digest must be exactly 64 lowercase hexadecimal characters")
+    }
+}
+
+impl std::error::Error for DigestParseError {}
+
+fn validate_sha256_hex(value: &str) -> Result<(), DigestParseError> {
+    if value.len() != 64
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err(DigestParseError);
+    }
+    Ok(())
+}
+
+macro_rules! define_digest_type {
+    ($name:ident) => {
+        impl TryFrom<&str> for $name {
+            type Error = DigestParseError;
+
+            fn try_from(value: &str) -> Result<Self, Self::Error> {
+                validate_sha256_hex(value)?;
+                Ok(Self(value.to_owned()))
+            }
+        }
+
+        impl $name {
+            pub fn as_str(&self) -> &str {
+                &self.0
+            }
+        }
+
+        impl std::fmt::Display for $name {
+            fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str(&self.0)
+            }
+        }
+    };
+}
+
+define_digest_type!(BarrierRootDigest);
+define_digest_type!(DependencyClosureRootDigest);
+
+/// Opaque UTF-8 cursor bytes. This type deliberately has no numeric parser.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct DependencyClosureCursor(Vec<u8>);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CursorParseError;
+
+impl std::fmt::Display for CursorParseError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("dependency closure cursor must be non-empty opaque UTF-8")
+    }
+}
+
+impl std::error::Error for CursorParseError {}
+
+impl TryFrom<&str> for DependencyClosureCursor {
+    type Error = CursorParseError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        if value.is_empty()
+            || value.bytes().all(|byte| byte.is_ascii_digit())
+        {
+            return Err(CursorParseError);
+        }
+        Ok(Self(value.as_bytes().to_vec()))
+    }
+}
+
+impl DependencyClosureCursor {
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+
+    pub fn as_str(&self) -> &str {
+        // Construction accepts only Rust &str, so these bytes are valid UTF-8.
+        std::str::from_utf8(&self.0).expect("cursor bytes originate from valid UTF-8")
+    }
+}
+
+impl std::fmt::Display for DependencyClosureCursor {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+/// Exact immutable receipt binding for one H field.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DFieldBinding {
+    pub field_name: String,
+    pub nominal_type_id: String,
+    pub authority_id: String,
+    pub namespace_id: String,
+    pub lineage_id: Option<String>,
+    pub canonical_value: String,
+    pub source_checkpoint_ref: String,
+    pub source_checkpoint_digest: String,
+    pub snapshot_receipt_digest: String,
+    pub binding_version: String,
+}
+
+/// Caller-supplied authoritative identity expectations for a single receipt.
+///
+/// Namespace and lineage expectations are keyed by the exact H field spelling.
+/// `None` lineage means that the field is not lineage-scoped.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DFieldBindingRequirements {
+    pub authority_id: String,
+    pub namespaces: BTreeMap<String, String>,
+    pub lineages: BTreeMap<String, Option<String>>,
+    pub snapshot_receipt_digest: String,
+    pub accepted_binding_versions: BTreeSet<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DFieldBindingError {
+    WrongFieldCount { expected: usize, actual: usize },
+    MissingField(String),
+    DuplicateField(String),
+    UnknownField(String),
+    MissingExpectation(String),
+    WrongNominalType { field: String, expected: String, actual: String },
+    WrongAuthority(String),
+    WrongNamespace(String),
+    WrongLineage(String),
+    WrongSnapshotDigest(String),
+    InvalidCanonicalValue(String),
+    MissingCheckpointReference(String),
+    InvalidCheckpointDigest(String),
+    UnsupportedBindingVersion(String),
+    InvalidRequirements(String),
+}
+
+impl std::fmt::Display for DFieldBindingError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "{self:?}")
+    }
+}
+
+impl std::error::Error for DFieldBindingError {}
+
+const REQUIRED_D_FIELD_TYPES: [(&str, &str); 8] = [
+    ("producer_registration_high_water", "ProducerRegistrationHighWater"),
+    ("forget_fence_generation_high_water", "ForgetFenceGeneration"),
+    ("work_item_high_water", "ProducerWorkItemHighWater"),
+    ("attempt_high_water", "ProducerWorkAttemptHighWater"),
+    ("barrier_generation", "BarrierGeneration"),
+    ("barrier_root", "BarrierRootDigest"),
+    ("dependency_closure_cursor", "DependencyClosureCursor"),
+    ("dependency_closure_root", "DependencyClosureRootDigest"),
+];
+
+fn validate_bound_value(
+    field_name: &str,
+    nominal_type_id: &str,
+    value: &str,
+) -> Result<(), DFieldBindingError> {
+    let valid = match (field_name, nominal_type_id) {
+        ("producer_registration_high_water", "ProducerRegistrationHighWater") => {
+            ProducerRegistrationHighWater::try_from(value)
+                .is_ok_and(|parsed| parsed.to_string() == value)
+        }
+        ("forget_fence_generation_high_water", "ForgetFenceGeneration") => {
+            ForgetFenceGeneration::try_from(value)
+                .is_ok_and(|parsed| parsed.to_string() == value)
+        }
+        ("work_item_high_water", "ProducerWorkItemHighWater") => {
+            ProducerWorkItemHighWater::try_from(value)
+                .is_ok_and(|parsed| parsed.to_string() == value)
+        }
+        ("attempt_high_water", "ProducerWorkAttemptHighWater") => {
+            ProducerWorkAttemptHighWater::try_from(value)
+                .is_ok_and(|parsed| parsed.to_string() == value)
+        }
+        ("barrier_generation", "BarrierGeneration") => {
+            BarrierGeneration::try_from(value)
+                .is_ok_and(|parsed| parsed.to_string() == value)
+        }
+        ("barrier_root", "BarrierRootDigest") => {
+            BarrierRootDigest::try_from(value).is_ok()
+        }
+        ("dependency_closure_cursor", "DependencyClosureCursor") => {
+            DependencyClosureCursor::try_from(value).is_ok()
+        }
+        ("dependency_closure_root", "DependencyClosureRootDigest") => {
+            DependencyClosureRootDigest::try_from(value).is_ok()
+        }
+        _ => {
+            return Err(DFieldBindingError::WrongNominalType {
+                field: field_name.to_owned(),
+                expected: REQUIRED_D_FIELD_TYPES
+                    .iter()
+                    .find(|(field, _)| *field == field_name)
+                    .map(|(_, nominal)| (*nominal).to_owned())
+                    .unwrap_or_else(|| "unknown field".to_owned()),
+                actual: nominal_type_id.to_owned(),
+            });
+        }
+    };
+
+    if valid {
+        Ok(())
+    } else {
+        Err(DFieldBindingError::InvalidCanonicalValue(
+            field_name.to_owned(),
+        ))
+    }
+}
+
+/// Validate the closed-world eight-field binding collection.
+///
+/// Both the exact field name and its nominal type identifier select the value
+/// parser. A syntactically valid value for another nominal domain is rejected.
+pub fn validate_field_bindings(
+    bindings: &[DFieldBinding],
+    requirements: &DFieldBindingRequirements,
+) -> Result<(), DFieldBindingError> {
+    if bindings.len() != REQUIRED_D_FIELD_TYPES.len() {
+        return Err(DFieldBindingError::WrongFieldCount {
+            expected: REQUIRED_D_FIELD_TYPES.len(),
+            actual: bindings.len(),
+        });
+    }
+
+    if requirements.authority_id.trim().is_empty()
+        || requirements.snapshot_receipt_digest.trim().is_empty()
+        || requirements.accepted_binding_versions.is_empty()
+    {
+        return Err(DFieldBindingError::InvalidRequirements(
+            "authority, snapshot digest, and accepted versions are required".to_owned(),
+        ));
+    }
+
+    validate_sha256_hex(&requirements.snapshot_receipt_digest)
+        .map_err(|_| DFieldBindingError::InvalidRequirements(
+            "snapshot receipt digest is not lowercase SHA-256".to_owned(),
+        ))?;
+
+    let mut seen = BTreeSet::new();
+
+    for binding in bindings {
+        if !REQUIRED_D_FIELD_TYPES
+            .iter()
+            .any(|(field, _)| *field == binding.field_name)
+        {
+            return Err(DFieldBindingError::UnknownField(
+                binding.field_name.clone(),
+            ));
+        }
+
+        if !seen.insert(binding.field_name.as_str()) {
+            return Err(DFieldBindingError::DuplicateField(
+                binding.field_name.clone(),
+            ));
+        }
+
+        let expected_type = REQUIRED_D_FIELD_TYPES
+            .iter()
+            .find(|(field, _)| *field == binding.field_name)
+            .map(|(_, nominal)| *nominal)
+            .ok_or_else(|| DFieldBindingError::UnknownField(binding.field_name.clone()))?;
+
+        if binding.nominal_type_id != expected_type {
+            return Err(DFieldBindingError::WrongNominalType {
+                field: binding.field_name.clone(),
+                expected: expected_type.to_owned(),
+                actual: binding.nominal_type_id.clone(),
+            });
+        }
+
+        if binding.authority_id != requirements.authority_id {
+            return Err(DFieldBindingError::WrongAuthority(
+                binding.field_name.clone(),
+            ));
+        }
+
+        let expected_namespace = requirements
+            .namespaces
+            .get(&binding.field_name)
+            .ok_or_else(|| DFieldBindingError::MissingExpectation(
+                format!("namespace for {}", binding.field_name),
+            ))?;
+        if binding.namespace_id != *expected_namespace {
+            return Err(DFieldBindingError::WrongNamespace(
+                binding.field_name.clone(),
+            ));
+        }
+
+        let expected_lineage = requirements
+            .lineages
+            .get(&binding.field_name)
+            .ok_or_else(|| DFieldBindingError::MissingExpectation(
+                format!("lineage for {}", binding.field_name),
+            ))?;
+        if &binding.lineage_id != expected_lineage {
+            return Err(DFieldBindingError::WrongLineage(
+                binding.field_name.clone(),
+            ));
+        }
+
+        if binding.snapshot_receipt_digest != requirements.snapshot_receipt_digest {
+            return Err(DFieldBindingError::WrongSnapshotDigest(
+                binding.field_name.clone(),
+            ));
+        }
+
+        if !requirements
+            .accepted_binding_versions
+            .contains(&binding.binding_version)
+        {
+            return Err(DFieldBindingError::UnsupportedBindingVersion(
+                binding.binding_version.clone(),
+            ));
+        }
+
+        if binding.source_checkpoint_ref.trim().is_empty() {
+            return Err(DFieldBindingError::MissingCheckpointReference(
+                binding.field_name.clone(),
+            ));
+        }
+
+        validate_sha256_hex(&binding.source_checkpoint_digest)
+            .map_err(|_| DFieldBindingError::InvalidCheckpointDigest(
+                binding.field_name.clone(),
+            ))?;
+
+        validate_bound_value(
+            &binding.field_name,
+            &binding.nominal_type_id,
+            &binding.canonical_value,
+        )?;
+    }
+
+    for (field_name, _) in REQUIRED_D_FIELD_TYPES {
+        if !seen.contains(field_name) {
+            return Err(DFieldBindingError::MissingField(
+                field_name.to_owned(),
+            ));
+        }
+    }
+
+    Ok(())
+}
 
 /// One registration considered by the D serialization proof.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -427,7 +800,7 @@ mod tests {
         evidence.canonical_request_digest = Some("request-digest".into());
         evidence.target_set_digest = Some("target-digest".into());
         evidence.forget_fence_cursor = Some("fence-cursor-8".into());
-        evidence.forget_fence_generation = Some(ForgetFenceGeneration(8));
+        evidence.forget_fence_generation = ForgetFenceGeneration::new(8);
         evidence.installation_canonical_commit_cursor = Some("commit-cursor-9".into());
         evidence.immutable_snapshot_id = Some("snapshot-1".into());
         evidence.captured_producer_registration_high_water =
@@ -443,7 +816,7 @@ mod tests {
         evidence.barrier_canonical_request_digest = Some("request-digest".into());
         evidence.barrier_target_set_digest = Some("target-digest".into());
         evidence.barrier_forget_fence_cursor = Some("fence-cursor-8".into());
-        evidence.barrier_forget_fence_generation = Some(ForgetFenceGeneration(8));
+        evidence.barrier_forget_fence_generation = ForgetFenceGeneration::new(8);
         evidence.barrier_installation_canonical_commit_cursor =
             Some("commit-cursor-9".into());
         evidence.barrier_immutable_snapshot_id = Some("snapshot-1".into());
@@ -527,7 +900,7 @@ mod tests {
     #[test]
     fn fence_generation_mismatch_is_invalid() {
         let mut evidence = complete_evidence();
-        evidence.barrier_forget_fence_generation = Some(ForgetFenceGeneration(9));
+        evidence.barrier_forget_fence_generation = ForgetFenceGeneration::new(9);
         assert!(matches!(
             evaluate_six_conditions(&evidence),
             SixConditionVerdict::Invalid(_)
@@ -556,7 +929,7 @@ mod tests {
         evidence.canonical_request_digest = Some("request-digest".into());
         evidence.target_set_digest = Some("target-digest".into());
         evidence.forget_fence_cursor = Some("fence-cursor-8".into());
-        evidence.forget_fence_generation = Some(ForgetFenceGeneration(8));
+        evidence.forget_fence_generation = ForgetFenceGeneration::new(8);
         evidence.installation_canonical_commit_cursor = Some("commit-cursor-9".into());
         assert!(matches!(
             evaluate_six_conditions(&evidence),
@@ -686,5 +1059,254 @@ mod tests {
     #[test]
     fn empty_high_water_is_rejected() {
         assert!(ProducerRegistrationHighWater::try_from("").is_err());
+    }
+
+    fn binding_requirements() -> DFieldBindingRequirements {
+        let mut namespaces = BTreeMap::new();
+        let mut lineages = BTreeMap::new();
+        for (field, _) in REQUIRED_D_FIELD_TYPES {
+            namespaces.insert(field.to_owned(), format!("namespace-{field}"));
+            lineages.insert(
+                field.to_owned(),
+                if field.starts_with("dependency_closure_") {
+                    Some("lineage-dependency-v1".to_owned())
+                } else {
+                    None
+                },
+            );
+        }
+        DFieldBindingRequirements {
+            authority_id: "authority-D".to_owned(),
+            namespaces,
+            lineages,
+            snapshot_receipt_digest: "a".repeat(64),
+            accepted_binding_versions: BTreeSet::from(["D-contract-1.3.1".to_owned()]),
+        }
+    }
+
+    fn complete_bindings() -> Vec<DFieldBinding> {
+        REQUIRED_D_FIELD_TYPES
+            .iter()
+            .map(|(field, nominal)| {
+                let canonical_value = match *field {
+                    "producer_registration_high_water"
+                    | "forget_fence_generation_high_water"
+                    | "work_item_high_water"
+                    | "attempt_high_water"
+                    | "barrier_generation" => "7".to_owned(),
+                    "barrier_root" | "dependency_closure_root" => "b".repeat(64),
+                    "dependency_closure_cursor" => "cursor:opaque:v1".to_owned(),
+                    _ => String::new(),
+                };
+                DFieldBinding {
+                    field_name: (*field).to_owned(),
+                    nominal_type_id: (*nominal).to_owned(),
+                    authority_id: "authority-D".to_owned(),
+                    namespace_id: format!("namespace-{field}"),
+                    lineage_id: if field.starts_with("dependency_closure_") {
+                        Some("lineage-dependency-v1".to_owned())
+                    } else {
+                        None
+                    },
+                    canonical_value,
+                    source_checkpoint_ref: format!("checkpoint-{field}"),
+                    source_checkpoint_digest: "c".repeat(64),
+                    snapshot_receipt_digest: "a".repeat(64),
+                    binding_version: "D-contract-1.3.1".to_owned(),
+                }
+            })
+            .collect()
+    }
+
+    #[test]
+    fn all_eight_nominal_bindings_are_accepted() {
+        assert!(validate_field_bindings(&complete_bindings(), &binding_requirements()).is_ok());
+    }
+
+    #[test]
+    fn every_high_water_type_accepts_leading_zeroes_and_canonicalizes() {
+        assert_eq!(ProducerRegistrationHighWater::try_from("0007").unwrap().to_string(), "7");
+        assert_eq!(ForgetFenceGeneration::try_from("0007").unwrap().to_string(), "7");
+        assert_eq!(ProducerWorkItemHighWater::try_from("0007").unwrap().to_string(), "7");
+        assert_eq!(ProducerWorkAttemptHighWater::try_from("0007").unwrap().to_string(), "7");
+        assert_eq!(BarrierGeneration::try_from("0007").unwrap().to_string(), "7");
+    }
+
+    #[test]
+    fn high_water_maximum_signed_value_is_accepted() {
+        assert_eq!(
+            BarrierGeneration::try_from("9223372036854775807").unwrap().get(),
+            i64::MAX as u64
+        );
+    }
+
+    #[test]
+    fn high_water_above_maximum_is_rejected() {
+        assert!(ProducerWorkItemHighWater::try_from("9223372036854775808").is_err());
+    }
+
+    #[test]
+    fn empty_high_water_is_rejected_for_each_nominal_domain() {
+        assert!(ForgetFenceGeneration::try_from("").is_err());
+        assert!(ProducerWorkAttemptHighWater::try_from("").is_err());
+    }
+
+    #[test]
+    fn unicode_decimal_digits_are_rejected() {
+        assert!(BarrierGeneration::try_from("１２３").is_err());
+    }
+
+    #[test]
+    fn negative_high_water_is_rejected_for_new_domains() {
+        assert!(ProducerWorkItemHighWater::try_from("-1").is_err());
+    }
+
+    #[test]
+    fn distinct_nominal_types_do_not_implement_cross_type_equality() {
+        // Compile-time contract: ProducerRegistrationHighWater and
+        // ForgetFenceGeneration have no cross-type PartialEq implementation.
+        // Consequently `registration == generation` does not type-check.
+        let registration = ProducerRegistrationHighWater::new(1).unwrap();
+        let generation = ForgetFenceGeneration::new(1).unwrap();
+        assert_eq!(registration.get(), 1);
+        assert_eq!(generation.get(), 1);
+    }
+
+    #[test]
+    fn missing_one_of_eight_fields_is_rejected() {
+        let mut bindings = complete_bindings();
+        bindings.pop();
+        assert!(matches!(
+            validate_field_bindings(&bindings, &binding_requirements()),
+            Err(DFieldBindingError::WrongFieldCount { .. })
+        ));
+    }
+
+    #[test]
+    fn nine_fields_are_rejected() {
+        let mut bindings = complete_bindings();
+        bindings.push(bindings[0].clone());
+        assert!(matches!(
+            validate_field_bindings(&bindings, &binding_requirements()),
+            Err(DFieldBindingError::WrongFieldCount { .. })
+        ));
+    }
+
+    #[test]
+    fn duplicate_field_is_rejected() {
+        let mut bindings = complete_bindings();
+        bindings[1].field_name = bindings[0].field_name.clone();
+        assert!(matches!(
+            validate_field_bindings(&bindings, &binding_requirements()),
+            Err(DFieldBindingError::DuplicateField(_))
+        ));
+    }
+
+    #[test]
+    fn unknown_field_name_is_rejected() {
+        let mut bindings = complete_bindings();
+        bindings[0].field_name = "unexpected_high_water".to_owned();
+        assert!(matches!(
+            validate_field_bindings(&bindings, &binding_requirements()),
+            Err(DFieldBindingError::UnknownField(_))
+        ));
+    }
+
+    #[test]
+    fn wrong_nominal_type_identifier_is_rejected() {
+        let mut bindings = complete_bindings();
+        bindings[0].nominal_type_id = "ForgetFenceGeneration".to_owned();
+        assert!(matches!(
+            validate_field_bindings(&bindings, &binding_requirements()),
+            Err(DFieldBindingError::WrongNominalType { .. })
+        ));
+    }
+
+    #[test]
+    fn hexadecimal_value_in_decimal_field_is_rejected() {
+        let mut bindings = complete_bindings();
+        bindings[0].canonical_value = "b".repeat(64);
+        assert!(matches!(
+            validate_field_bindings(&bindings, &binding_requirements()),
+            Err(DFieldBindingError::InvalidCanonicalValue(_))
+        ));
+    }
+
+    #[test]
+    fn decimal_value_in_cursor_field_is_rejected() {
+        let mut bindings = complete_bindings();
+        let cursor = bindings
+            .iter_mut()
+            .find(|binding| binding.field_name == "dependency_closure_cursor")
+            .unwrap();
+        cursor.canonical_value = "12345".to_owned();
+        assert!(matches!(
+            validate_field_bindings(&bindings, &binding_requirements()),
+            Err(DFieldBindingError::InvalidCanonicalValue(_))
+        ));
+    }
+
+    #[test]
+    fn cursor_text_in_high_water_field_is_rejected() {
+        let mut bindings = complete_bindings();
+        bindings[0].canonical_value = "cursor:opaque:v1".to_owned();
+        assert!(matches!(
+            validate_field_bindings(&bindings, &binding_requirements()),
+            Err(DFieldBindingError::InvalidCanonicalValue(_))
+        ));
+    }
+
+    #[test]
+    fn unsupported_binding_version_is_rejected() {
+        let mut bindings = complete_bindings();
+        bindings[0].binding_version = "D-contract-0.9".to_owned();
+        assert!(matches!(
+            validate_field_bindings(&bindings, &binding_requirements()),
+            Err(DFieldBindingError::UnsupportedBindingVersion(_))
+        ));
+    }
+
+    #[test]
+    fn wrong_authority_is_rejected() {
+        let mut bindings = complete_bindings();
+        bindings[0].authority_id = "authority-other".to_owned();
+        assert!(matches!(
+            validate_field_bindings(&bindings, &binding_requirements()),
+            Err(DFieldBindingError::WrongAuthority(_))
+        ));
+    }
+
+    #[test]
+    fn wrong_namespace_is_rejected() {
+        let mut bindings = complete_bindings();
+        bindings[0].namespace_id = "namespace-other".to_owned();
+        assert!(matches!(
+            validate_field_bindings(&bindings, &binding_requirements()),
+            Err(DFieldBindingError::WrongNamespace(_))
+        ));
+    }
+
+    #[test]
+    fn wrong_lineage_is_rejected() {
+        let mut bindings = complete_bindings();
+        let cursor = bindings
+            .iter_mut()
+            .find(|binding| binding.field_name == "dependency_closure_cursor")
+            .unwrap();
+        cursor.lineage_id = Some("lineage-other".to_owned());
+        assert!(matches!(
+            validate_field_bindings(&bindings, &binding_requirements()),
+            Err(DFieldBindingError::WrongLineage(_))
+        ));
+    }
+
+    #[test]
+    fn wrong_snapshot_digest_is_rejected() {
+        let mut bindings = complete_bindings();
+        bindings[0].snapshot_receipt_digest = "d".repeat(64);
+        assert!(matches!(
+            validate_field_bindings(&bindings, &binding_requirements()),
+            Err(DFieldBindingError::WrongSnapshotDigest(_))
+        ));
     }
 }
